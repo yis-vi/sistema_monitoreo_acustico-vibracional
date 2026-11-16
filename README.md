@@ -1,34 +1,60 @@
-# 🎛️ Sistema Embarcado de Monitoreo Acústico-Vibracional
+<div align="center">
 
-![Estado](https://shields.io)
-![Hardware](https://shields.io)
-![Enfoque](https://shields.io)
+# Sistema Embarcado de Monitoreo Acústico-Vibracional
+### Alerta preventiva en tiempo real para detección temprana de fallas
 
-> **Prototipo de sistema embarcado para el monitoreo acústico-vibracional y alerta preventiva en tiempo real.**
+`Ingeniería Electrónica` • `Sistemas Embarcados` • `KiCad EDA` • `Prototipo 1`
 
----
-
-## 📋 Descripción del Proyecto
-
-Este repositorio contiene el desarrollo técnico, esquemáticos electrónicos y documentación del prototipo diseñado para detectar anomalías acústicas y de vibración en motores, generando alertas tempranas que previenen fallas mecánicas.
-
-### 📂 Contenido del Repositorio
-Todos los archivos fuente se encuentran organizados dentro de la carpeta **[`proyecto/`](./proyecto)**:
-* 📄 **Documentación:** Definición de requerimientos y modelo Canvas (`Definicion de requerimientos y modelo canvas.pdf`).
-* 🛠️ **Diseño Electrónico (KiCad):** Archivos de esquemático (`.kicad_sch`), placa PCB (`.kicad_pcb`) y librerías del prototipo 1.
-* 🖼️ **Diagramas:** Esquema general de bloques y arquitectura del sistema.
+</div>
 
 ---
 
-## 📊 Diagrama del Sistema
-
-![Diagrama del sistema](./proyecto/IMG-20261110-WA0028.jpg)
+> [!NOTE]
+> **Propósito del Proyecto:** Diseñar y desarrollar un prototipo de sistema embarcado capaz de capturar, procesar y analizar señales acústicas y de vibración en motores para emitir alertas preventivas en tiempo real.
 
 ---
 
-## 👥 Equipo de Trabajo
+## Objetivos y Alcance
 
-| Integrante | Rol / Programa |
+* **Adquisición de señales:** Captura simultánea de vibraciones mecánicas y espectro acústico.
+* **Procesamiento en tiempo real:** Análisis continuo en el sistema embarcado para identificar patrones anómalos.
+* **Alerta preventiva:** Notificación inmediata ante desviaciones críticas para evitar daños mayores en el equipo.
+
+---
+
+## Estructura del Repositorio
+
+Todos los entregables, esquemáticos y documentos técnicos están centralizados en una única carpeta para mantener el repositorio ordenado:
+
+```text
+sistema_monitoreo_acustico-vibracional/
+├── proyecto/
+│   ├── Definicion de requerimientos y modelo canvas.pdf
+│   ├── IMG-20261110-WA0028.jpg
+│   ├── sistema_monitoreo_acustico-vibracional.kicad_pro
+│   ├── sistema_monitoreo_acustico-vibracional.kicad_sch
+│   ├── sistema_monitoreo_acustico-vibracional.kicad_pcb
+│   └── sym-lib-table
+└── README.md
+```
+
+**[Explorar todos los archivos en la carpeta `proyecto/`](./proyecto)**
+
+---
+
+## Estado del Desarrollo
+
+- [x] Definición de requerimientos y Business Model Canvas
+- [x] Diseño de diagrama de bloques y arquitectura del sistema
+- [x] Diseño de esquemático electrónico en KiCad (Prototipo 1)
+- [ ] Enrutamiento final de placa PCB y validación
+- [ ] Pruebas de adquisición acústico-vibracional en tiempo real
+
+---
+
+## Equipo de Desarrollo
+
+| Integrante | Programa Académico |
 | :--- | :--- |
 | **Samuel Gabriel Medina Arciniegas** | Ingeniería Electrónica |
 | **Mateo Ruiz Palencia** | Ingeniería Electrónica |
@@ -37,8 +63,16 @@ Todos los archivos fuente se encuentran organizados dentro de la carpeta **[`pro
 
 ---
 
-## 🎓 Información Académica
+## Contexto Académico
 
-* **Asignaturas:** Taller de Ingeniería Electrónica — Introducción a la Ingeniería Electrónica.
-* **Fase actual:** Prototipo 1 (Esquemático y definición de requerimientos).
+| Detalle | Información |
+| :--- | :--- |
+| **Asignaturas** | Taller de Ingeniería Electrónica / Introducción a la Ingeniería Electrónica |
+| **Herramientas** | KiCad EDA / Sistemas Embebidos |
+| **Versión actual** | Prototipo 1 |
 
+---
+
+<div align="center">
+  <sub>Proyecto de Ingeniería Electrónica — Prototipo de Monitoreo de Vibración y Acústica</sub>
+</div>
