@@ -28,7 +28,7 @@ Todos los entregables, esquemáticos y documentos técnicos están centralizados
 
 ```text
 sistema_monitoreo_acustico-vibracional/
-├── proyecto/
+├── prototipo/
 │   ├── Definicion de requerimientos y modelo canvas.pdf
 │   ├── IMG-20261110-WA0028.jpg
 │   ├── sistema_monitoreo_acustico-vibracional.kicad_pro
