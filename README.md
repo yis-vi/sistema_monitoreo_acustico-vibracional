@@ -28,6 +28,9 @@ Todos los entregables, esquemáticos y documentos técnicos están centralizados
 
 ```text
 sistema_monitoreo_acustico-vibracional/
+|__ modelo 3d/
+|  |__modelo sentina
+|__|__modelo cabina 
 ├── prototipo/
 │   ├── Definicion de requerimientos y modelo canvas.pdf
 │   ├── IMG-20261110-WA0028.jpg
