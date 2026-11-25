@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nodo Cabina · modelo 3D</title>
+<style>
+:root{--bg:#eef1f5;--bg2:#fbfcfe;--fg:#1c2430;--mut:#5b6675;--card:#ffffffd9;--bd:#cfd6df;--ac:#1a73e8;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d131c;--bg2:#1c2a3d;--fg:#e8edf3;--mut:#93a0b1;--card:#141d2ad9;--bd:#2a3748;--ac:#5aa2ff}}
+:root[data-theme="dark"]{--bg:#0d131c;--bg2:#1c2a3d;--fg:#e8edf3;--mut:#93a0b1;--card:#141d2ad9;--bd:#2a3748;--ac:#5aa2ff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(circle at 50% 38%,var(--bg2),var(--bg) 72%);color:var(--fg);font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
+#top{padding:10px 14px 6px}
+#top b{font-size:1.05rem}
+#top span{display:block;font-size:.8rem;color:var(--mut)}
+#stage{flex:1;min-height:0;position:relative}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#info{margin:0 12px 8px;padding:8px 12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);font-size:.85rem;min-height:1.2em}
+#bar{display:flex;flex-wrap:wrap;gap:8px;padding:0 12px 12px}
+button{flex:1 1 auto;min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font-weight:600;font-size:.85rem}
+button:active{border-color:var(--ac);color:var(--ac)}
+
+#lay{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#lsvg{position:absolute;inset:0;width:100%;height:100%}
+#lsvg line{stroke:var(--mut);stroke-width:1}
+#lsvg circle{fill:var(--ac)}
+.lb{position:absolute;transform:translate(-50%,-50%);padding:2px 8px;border-radius:999px;background:var(--card);border:1px solid var(--bd);font-size:.68rem;font-weight:700;white-space:nowrap;color:var(--fg)}
+
+#sheet{position:absolute;left:10px;right:10px;bottom:10px;max-height:60%;overflow:auto;padding:12px 14px;border:1px solid var(--bd);border-radius:14px;background:var(--card);backdrop-filter:blur(8px);font-size:.8rem;display:none}
+#sheet h3{margin:0 0 6px;font-size:.9rem}
+#sheet table{width:100%;border-collapse:collapse}
+#sheet td{padding:4px 0;border-bottom:1px solid var(--bd)}
+#sheet td:last-child{text-align:right;color:var(--mut);padding-left:10px}
+</style>
+</head>
+<body>
+<div id="top"><b>Nodo Cabina · modelo 3D</b><span>ESP32 · OLED · LED · buzzer (pantalla simulada)</span></div>
+<div id="stage"><canvas id="c"></canvas><div id="lay"><svg id="lsvg"></svg></div><div id="sheet"></div></div>
+<div id="info">Caja ~82 × 50 × 32 mm. Toca una pieza para ver su nombre; la tapa abierta muestra las etiquetas.</div>
+<div id="bar"><button id="bLid">Abrir tapa</button><button id="bExp">Vista explosionada</button><button id="bLbl">Ocultar nombres</button><button id="bSpec">Ficha técnica</button><button id="bCam">Vista: Frontal</button><button id="bAl">Simular alerta</button></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const MODO='cabina';
+const $=id=>document.getElementById(id);
+const cv=$('c'),info=$('info'),lay=$('lay'),svg=$('lsvg');
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,3));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+const pm=new THREE.PMREMGenerator(renderer),es=new THREE.Scene();es.background=new THREE.Color(0x5d6b7e);
+[[0,16,0,36,.5,10],[14,6,0,.5,8,14],[-14,5,6,.5,6,10]].forEach(a=>{const b=new THREE.Mesh(new THREE.BoxGeometry(a[3],a[4],a[5]),new THREE.MeshBasicMaterial({color:0xffffff}));b.position.set(a[0],a[1],a[2]);es.add(b)});
+scene.environment=pm.fromScene(es,.05).texture;
+const camera=new THREE.PerspectiveCamera(36,1,.1,300);
+const controls=new THREE.OrbitControls(camera,cv);
+controls.target.set(0,1.8,-.4);controls.enableDamping=true;controls.maxPolarAngle=1.52;controls.minDistance=6;controls.maxDistance=50;controls.autoRotate=true;controls.autoRotateSpeed=.9;
+controls.addEventListener('start',()=>{controls.autoRotate=false;clearTimeout(idle)});controls.addEventListener('end',()=>{idle=setTimeout(()=>{controls.autoRotate=true},5000)});
+let fitted=false,baseD=22,camGoal=null,vi=0,fx=null,ledMat,mpuMat,redL,idle;
+function resize(){const w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;
+ renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();
+ if(!fitted){fitted=true;const d=Math.max(22,18/(0.65*camera.aspect));baseD=d;camera.position.set(0,.66*d,.76*d);controls.update()}}
+window.addEventListener('resize',resize);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8a97a8,.5));
+const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(8,20,11);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-12,right:12,top:12,bottom:-12,near:1,far:60});sun.shadow.bias=-.0004;scene.add(sun);
+const gnd=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.ShadowMaterial({opacity:.22}));gnd.rotation.x=-Math.PI/2;gnd.position.y=-.01;gnd.receiveShadow=true;scene.add(gnd);
+const pl=new THREE.Mesh(new THREE.CylinderGeometry(9.6,9.8,.25,72),new THREE.MeshStandardMaterial({color:0xdde3ea,roughness:.55,metalness:.05}));pl.position.y=-.14;pl.receiveShadow=true;scene.add(pl);
+
+let W=8.2,D=5,H=3.2,FL=.3,BASE=.3,HAS_OLED=false,lid;
+const M=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.5,metalness:.1},o||{}));
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const parts=[],pick=[],labs=[],wires=new THREE.Group();scene.add(wires);
+const STEEL=M(0xd0d5dc,{metalness:.95,roughness:.25}),PIN=M(0x222222),METAL=M(0xd5d9de,{metalness:.85,roughness:.28}),BLK=M(0x0e0e10);
+function sh_(o){o.castShadow=true;o.receiveShadow=true;return o}
+function bx(p,w,h,d,m,x,y,z){const o=sh_(new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m));o.position.set(x,y,z);p.add(o);return o}
+function cy(p,r,h,m,x,y,z,rx){const o=sh_(new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,28),m));o.position.set(x,y,z);if(rx)o.rotation.x=rx;p.add(o);return o}
+function part(name,x,y,z,dy){const g=new THREE.Group();g.position.set(x,y,z);g.userData={name:name,y0:y,dy:dy};scene.add(g);parts.push(g);pick.push(g);return g}
+function feet(g,w,d,h){if(h<=0)return;const m=M(0xd4af37,{metalness:.8,roughness:.3});
+ [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(a=>{cy(g,.17,h,m,a[0]*(w/2-.3),-h/2,a[1]*(d/2-.3));cy(g,.15,.08,STEEL,a[0]*(w/2-.3),.2,a[1]*(d/2-.3))})}
+function wire(a,b,c,r){const m=V((a.x+b.x)/2,Math.max(a.y,b.y)+(r===undefined?.6:r),(a.z+b.z)/2);
+ wires.add(sh_(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([a,m,b]),28,.05,8),M(c))))}
+function rr(w,d,r,s){s=s||new THREE.Shape();const x=-w/2,y=-d/2;
+ s.moveTo(x+r,y);s.lineTo(x+w-r,y);s.quadraticCurveTo(x+w,y,x+w,y+r);s.lineTo(x+w,y+d-r);s.quadraticCurveTo(x+w,y+d,x+w-r,y+d);
+ s.lineTo(x+r,y+d);s.quadraticCurveTo(x,y+d,x,y+d-r);s.lineTo(x,y+r);s.quadraticCurveTo(x,y,x+r,y);return s}
+function slab(shape,h,m,y,bv){const o=sh_(new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:!!bv,bevelSize:.05,bevelThickness:.05,bevelSegments:3,curveSegments:12}),m));o.rotation.x=-Math.PI/2;o.position.y=y;return o}
+function rect(cx,cz,w,h){const p=new THREE.Path();p.moveTo(cx-w/2,-(cz-h/2));p.lineTo(cx+w/2,-(cz-h/2));p.lineTo(cx+w/2,-(cz+h/2));p.lineTo(cx-w/2,-(cz+h/2));p.lineTo(cx-w/2,-(cz-h/2));return p}
+function circ(cx,cz,r){const p=new THREE.Path();p.absarc(cx,-cz,r,0,Math.PI*2,true);return p}
+function decal(g,txt,x,y,z,w,h,col){const c=document.createElement('canvas');c.width=256;c.height=Math.max(32,Math.round(256*h/w));
+ const q=c.getContext('2d');q.fillStyle=col;q.font='bold '+Math.round(c.height*.7)+'px sans-serif';q.textAlign='center';q.textBaseline='middle';q.fillText(txt,128,c.height/2);
+ const t=new THREE.CanvasTexture(c);t.anisotropy=8;
+ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false}));
+ m.rotation.x=-Math.PI/2;m.position.set(x,y,z);g.add(m)}
+function label(txt,x,z,w,h){decal(lid,txt,x,.32,D/2+z,w,h,'#22303f')}
+
+function shell(holes){
+ const body=new THREE.MeshPhysicalMaterial({color:0x22303f,roughness:.5,clearcoat:.6,clearcoatRoughness:.3}),rub=M(0x0e0e10,{roughness:.8});
+ const g=new THREE.Group(),hw=H-.3,wt=.25,R=.7;scene.add(g);
+ g.add(slab(rr(W,D,R),FL,body,0));
+ const ring=rr(W,D,R);ring.holes.push(rr(W-2*wt,D-2*wt,R-wt,new THREE.Path()));g.add(slab(ring,hw-FL,body,FL));
+ const gk=rr(W-.1,D-.1,R-.05);gk.holes.push(rr(W-.5,D-.5,R-.25,new THREE.Path()));g.add(slab(gk,.08,rub,hw));
+ [-1,1].forEach(s=>{const e=rr(1.7,2.4,.5),p=new THREE.Path();p.absarc(0,0,.3,0,Math.PI*2,true);e.holes.push(p);
+  const o=slab(e,.3,body,0);o.position.x=s*(W/2+.55);g.add(o);
+  cy(g,.34,.06,STEEL,s*(W/2+.55),.33,0)});
+ const ls=rr(W,D,R);ls.holes=holes||[];
+ lid=new THREE.Group();lid.position.set(0,hw+.08,-D/2);scene.add(lid);
+ const lm=slab(ls,.3,new THREE.MeshPhysicalMaterial({color:0xeef1f4,roughness:.35,clearcoat:1,clearcoatRoughness:.15}),0,1);lm.position.z=D/2;lid.add(lm);
+ [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(a=>cy(lid,.24,.1,STEEL,a[0]*(W/2-.5),.34,D/2+a[1]*(D/2-.5)));
+ return g}
+function glass(cx,cz,w,h){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.14,roughness:0,metalness:.3,depthWrite:false}));
+ m.rotation.x=-Math.PI/2;m.position.set(cx,.27,D/2+cz);lid.add(m)}
+function gland(y,z){const g=new THREE.Group();scene.add(g);const dk=M(0x171c22);
+ let o=sh_(new THREE.Mesh(new THREE.CylinderGeometry(.62,.62,.35,6),dk));o.rotation.z=Math.PI/2;o.position.set(W/2+.1,y,z);g.add(o);
+ o=cy(g,.42,.6,dk,W/2+.45,y,z);o.rotation.z=Math.PI/2;
+ o=sh_(new THREE.Mesh(new THREE.CylinderGeometry(.22,.4,.8,20),dk));o.rotation.z=-Math.PI/2;o.position.set(W/2+1.05,y,z);g.add(o);
+ o=cy(g,.2,2.6,BLK,W/2+2.7,y,z);o.rotation.z=Math.PI/2;return g}
+function vent(y,z){const g=new THREE.Group();scene.add(g);
+ let o=cy(g,.38,.22,M(0xe9ecef),-W/2-.1,y,z);o.rotation.z=Math.PI/2;
+ o=cy(g,.26,.06,M(0xb0b7c0,{roughness:.9}),-W/2-.24,y,z);o.rotation.z=Math.PI/2;return g}
+function esp(x,z){const g=part('ESP32 DevKit con cables Dupont (sin soldar)',x,BASE,z,4);
+ bx(g,5.2,.15,2.8,M(0x1b1e24),0,.5,0);bx(g,4.6,.35,.25,PIN,0,.22,-1.2);bx(g,4.6,.35,.25,PIN,0,.22,1.2);
+ bx(g,2.4,.2,1.8,METAL,-1,.68,0);bx(g,.4,.03,1.7,M(0x8a7a3a),-2.4,.59,0);
+ bx(g,.4,.2,.4,M(0xdddddd),1.5,.62,-.9);bx(g,.4,.2,.4,M(0xdddddd),1.5,.62,.9);
+ bx(g,.15,.05,.15,M(0xff3030,{emissive:0x800000}),.9,.6,0);bx(g,.9,.35,.9,METAL,2.5,.7,0);
+ decal(g,'ESP32-WROOM',-1,.8,0,2,.4,'#2a2d33');
+ const cs=[0xf2c200,0x2fb344,0x3a7bd5,0xe5202e];
+ [-1,1].forEach(s=>[-1.2,.9].forEach(px=>{bx(g,1,.8,.25,M(0x151515),px,1,s*1.22);
+  cs.forEach((c,i)=>cy(g,.04,.6,M(c),px-.37+i*.25,1.7,s*1.22))}));return g}
+function oled(x,z,h){const g=part('Pantalla OLED SH1106 (sobre separadores)',x,BASE+h,z,5);
+ feet(g,3.4,3.4,h);bx(g,3.5,.18,3.5,M(0x1737a8),0,.09,0);bx(g,3.1,.04,1.7,M(0x000000),0,.2,-.2);
+ bx(g,1.1,.3,.25,PIN,0,.3,-1.55);decal(g,'OLED 1,3\" SH1106',0,.2,1.35,2.2,.3,'#cfe0ff');
+ const s=new THREE.Mesh(new THREE.PlaneGeometry(3,1.5),new THREE.MeshBasicMaterial({map:otex}));
+ s.rotation.x=-Math.PI/2;s.position.set(0,.23,-.2);g.add(s);return g}
+function buzzer(x,z,h){const g=part('Buzzer pasivo MH-FMD (suena por la rejilla)',x,BASE+h,z,4);g.rotation.y=Math.PI/2;
+ feet(g,4.2,2,h);bx(g,4.2,.15,2,M(0x1737a8),0,.08,0);cy(g,.6,.8,BLK,-1,.55,0);cy(g,.12,.05,M(0x333333),-1,.97,0);
+ bx(g,.4,.2,.3,BLK,.6,.2,.4);bx(g,.8,.3,.25,PIN,1.8,.25,0);decal(g,'MH-FMD',.8,.17,-.5,1.6,.3,'#cfe0ff');return g}
+function mpu(x,z){const g=part('Sensor MPU6050 (atornillado al fondo, rígido)',x,BASE+.6,z,3);
+ feet(g,2.1,1.6,.6);bx(g,2.1,.15,1.6,(mpuMat=M(0x6a3fb5)),0,.08,0);bx(g,.5,.12,.5,BLK,0,.2,0);bx(g,1.8,.35,.25,PIN,0,.2,-.6);
+ bx(g,.3,.1,.2,BLK,.6,.19,.3);decal(g,'MPU6050',0,.17,.5,1.4,.25,'#f1e6ff');return g}
+function sd(x,z,h){const g=part('Módulo microSD (se saca la tarjeta al abrir la tapa)',x,BASE+h,z,5);
+ feet(g,4.2,2.4,h);bx(g,4.2,.15,2.4,M(0x1a6b8a),0,.08,0);bx(g,1.6,.3,1.5,METAL,1.2,.25,0);
+ bx(g,1.6,.3,.25,PIN,-1.2,.25,-1);bx(g,.5,.1,.5,BLK,-.2,.19,.4);decal(g,'microSD',-.9,.17,.5,1.4,.3,'#d9f2ff');return g}
+function led(x,z){const g=new THREE.Group();g.position.set(x,.3,D/2+z);g.userData={name:'LED rojo de alerta + resistencia 220 Ω'};lid.add(g);pick.push(g);
+ cy(g,.6,.18,M(0x151a20),0,.09,0);cy(g,.42,.45,(ledMat=M(0xff2a3a,{emissive:0xc0000f})),0,.28,0);redL=new THREE.PointLight(0xff2030,0,14);redL.position.set(0,.8,0);g.add(redL);cy(g,.42,.9,M(0xff6a74,{emissive:0x600008}),0,-.6,0);
+ cy(g,.55,.12,STEEL,0,-.1,0);
+ const r=cy(g,.1,.7,M(0xd2b48c),.55,-1,0);r.rotation.z=Math.PI/2;
+ [[-.2,0xb5651d],[0,0xb5651d],[.2,0xff2200]].forEach(b=>{const o=cy(g,.105,.06,M(b[1]),.55+b[0],-1,0);o.rotation.z=Math.PI/2});return g}
+
+function addLabel(txt,obj,off,dx,dy,closedToo){const el=document.createElement('div');el.className='lb';el.textContent=txt;lay.appendChild(el);
+ const ln=document.createElementNS('http://www.w3.org/2000/svg','line'),dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+ dot.setAttribute('r',3.5);svg.appendChild(ln);svg.appendChild(dot);labs.push({el,ln,dot,obj,off,dx,dy,closedToo})}
+let showLbl=true;
+function updLabels(){const w=cv.clientWidth,h=cv.clientHeight;
+ labs.forEach(l=>{const vis=showLbl&&(lidT!==0||l.closedToo);
+  l.el.style.display=l.ln.style.display=l.dot.style.display=vis?'':'none';if(!vis)return;
+  const p=l.obj.localToWorld(l.off.clone()).project(camera),x=(p.x*.5+.5)*w,y=(-p.y*.5+.5)*h;
+  l.dot.setAttribute('cx',x);l.dot.setAttribute('cy',y);
+  l.ln.setAttribute('x1',x);l.ln.setAttribute('y1',y);l.ln.setAttribute('x2',x+l.dx);l.ln.setAttribute('y2',y+l.dy);
+  l.el.style.left=(x+l.dx)+'px';l.el.style.top=(y+l.dy)+'px'})}
+
+const oc=document.createElement('canvas');oc.width=256;oc.height=128;
+const ox=oc.getContext('2d');
+const otex=new THREE.CanvasTexture(oc);otex.anisotropy=8;
+let alerta=false;
+function drawOled(t){
+ ox.setTransform(2,0,0,2,0,0);
+ const n=Math.round(70+30*Math.sin(t/600)),U=2000;
+ ox.fillStyle='#000';ox.fillRect(0,0,128,64);ox.fillStyle='#fff';ox.textBaseline='top';ox.textAlign='left';
+ if(alerta){
+  if(Math.floor(t/250)%2===0){ox.fillRect(0,0,128,64);ox.fillStyle='#000'}
+  ox.textAlign='center';ox.font='bold 15px monospace';ox.fillText('RUIDO',64,3);ox.fillText('CRITICO',64,21);
+  ox.font='9px monospace';ox.fillText('REDUZCA VELOCIDAD',64,43);ox.fillText('Vibr: 2310',64,54);
+ }else{
+  ox.font='9px monospace';ox.fillText('VIBRACION',0,0);ox.fillText('OK',116,0);ox.fillRect(0,9,128,1);
+  ox.font='bold 24px monospace';ox.fillText(String(n),0,13);
+  ox.font='9px monospace';ox.fillText('UMBRAL',84,13);ox.fillText(String(U),84,23);ox.fillText(Math.round(n*100/U)+'%',84,33);
+  ox.strokeStyle='#fff';ox.lineWidth=1;ox.strokeRect(.5,41.5,127,8);ox.fillRect(2,43,Math.round(n/2500*124),5);ox.fillRect(2+Math.round(U/2500*124),39,1,13);
+  for(let x=0;x<128;x++){const h=Math.round(1+4*(1+Math.sin(x/5+t/300)));ox.fillRect(x,64-h,1,h)}
+ }
+ otex.needsUpdate=true}
+
+let lidT=0,expT=0,expV=1,lastO=-999;
+HAS_OLED=true;
+const sh=shell([rect(1,-.2,3.1,1.7),circ(-2.8,-1.3,.43),circ(-2.8,.6,.2),circ(-2.8,1,.2),circ(-2.8,1.4,.2)]);
+glass(1,-.2,3.1,1.7);
+const E=esp(1,0),O=oled(1,0,2.3),B=buzzer(-2.8,0,1.8),L=led(-2.8,-1.3),G=gland(1,0),T=vent(1.5,.9);
+label('CABINA',1,1.55,2.2,.5);label('ALERTA',-2.8,-2,1.2,.32);
+wire(V(.9,2.3,-1.22),V(1,2.7,-1.55),0xf2c200,.2);
+wire(V(-.2,2.3,-1.22),V(-2.8,2.6,-1.3),0xe5202e,.5);
+wire(V(-.2,2.3,1.22),V(-2.8,2.3,-1.9),0xff8a00,.5);
+addLabel('ESP32',E,V(-1.6,.8,1.4),-75,52);
+addLabel('Pantalla OLED',O,V(1.2,.3,.6),78,-40,true);
+addLabel('Buzzer',B,V(0,1.1,0),-78,10);
+addLabel('LED + 220 Ω',L,V(0,.6,0),-78,-34,true);
+addLabel('Cable USB',G,V(W/2+2,1,0),30,34);
+addLabel('Venteo',T,V(-W/2-.25,1.5,.9),-58,52);
+addLabel('Orejas de fijación',sh,V(W/2+.55,.3,0),62,58);
+addLabel('Empaque',sh,V(-W/2+1.2,H-.26,D/2-.1),-8,72);
+
+const SPEC={t:'Nodo Cabina · ~82 × 50 × 32 mm',r:[['ESP32 DevKit','Recibe por ESP-NOW'],['OLED 1,3" SH1106','I2C · SDA 21 · SCL 22'],['LED rojo + 220 Ω','GPIO 25'],['Buzzer pasivo MH-FMD','GPIO 26 · tone()'],['Caja','Tapa con empaque · tornillos inox'],['Fijación','Orejas + venteo de presión'],['Alimentación','USB-C por prensacables']]};
+const rg=[0,1,2].map(i=>{const m=new THREE.Mesh(new THREE.TorusGeometry(.5,.03,8,32),new THREE.MeshBasicMaterial({color:0xff4050,transparent:true,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.set(-2.8,.7,D/2+1);m.visible=false;lid.add(m);return m});
+fx=t=>{const a=alerta;ledMat.emissiveIntensity=a?1+1.6*Math.abs(Math.sin(t/110)):.5;redL.intensity=a?2.2*Math.abs(Math.sin(t/110)):0;
+ rg.forEach((m,i)=>{m.visible=a;if(a){const p=((t/700)+i/3)%1;m.scale.setScalar(1+p*3.2);m.material.opacity=.9*(1-p)}})};
+function setLid(open){lidT=open?-1.95:0;$('bLid').textContent=open?'Cerrar tapa':'Abrir tapa'}
+$('bLid').onclick=()=>setLid(!lidT);
+$('bExp').onclick=e=>{expT=expT?0:1;e.target.textContent=expT?'Armar':'Vista explosionada';setLid(!!expT)};
+$('bLbl').onclick=e=>{showLbl=!showLbl;e.target.textContent=showLbl?'Ocultar nombres':'Ver nombres'};
+const AT=MODO==='cabina'?['Simular alerta','Quitar alerta']:['Simular vibración','Detener vibración'];
+$('bAl').onclick=e=>{alerta=!alerta;e.target.textContent=alerta?AT[1]:AT[0]};
+const VS=[[0,.66,.76,1,'Frontal'],[0,.99,.14,1,'Superior'],[.95,.3,.15,1,'Lateral'],[.3,.5,.5,.62,'Detalle']];
+$('bCam').onclick=()=>{vi=(vi+1)%4;const v=VS[vi];camGoal=V(v[0],v[1],v[2]).multiplyScalar(baseD*v[3]);controls.autoRotate=false;$('bCam').textContent='Vista: '+v[4]};
+$('bSpec').onclick=()=>{const q=$('sheet');q.style.display=q.style.display==='block'?'none':'block'};
+$('sheet').innerHTML='<h3>'+SPEC.t+'</h3><table>'+SPEC.r.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('')+'</table>';
+const ray=new THREE.Raycaster(),mp=new THREE.Vector2();
+cv.addEventListener('click',e=>{const r=cv.getBoundingClientRect();
+ mp.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mp,camera);
+ const hit=ray.intersectObjects(pick,true)[0];
+ if(hit){let o=hit.object;while(o&&!o.userData.name)o=o.parent;if(o)info.textContent=o.userData.name}});
+function loop(t){requestAnimationFrame(loop);
+ lid.rotation.x+=(lidT-lid.rotation.x)*.1;expV+=(expT-expV)*.1;
+ parts.forEach(g=>{g.position.y=g.userData.y0+g.userData.dy*expV});
+ wires.visible=expV<.1;
+ if(HAS_OLED&&t-lastO>90){drawOled(t);lastO=t}
+ if(camGoal){camera.position.lerp(camGoal,.1);if(camera.position.distanceTo(camGoal)<.05)camGoal=null}
+ if(fx)fx(t);
+ controls.update();renderer.render(scene,camera);updLabels()}
+setLid(true);lid.rotation.x=lidT;
+resize();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
